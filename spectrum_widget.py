@@ -61,6 +61,10 @@ class DiffWidget(pg.PlotWidget):
         )
         self.addItem(self._fill)
 
+        # Live EQ suggestion markers
+        self._eq_markers = pg.ScatterPlotItem(size=12, pen=pg.mkPen('#000000', width=1))
+        self.addItem(self._eq_markers)
+
     def set_diff_color(self, hex_color: str):
         self._color = hex_color
         self._curve.setPen(pg.mkPen(hex_color, width=2))
@@ -71,9 +75,24 @@ class DiffWidget(pg.PlotWidget):
         self._zeros.setData(log_x, np.zeros_like(diff_db))
         self._curve.setData(log_x, diff_db)
 
+    def update_eq_markers(self, bands: list):
+        if not bands:
+            self._eq_markers.setData([], [])
+            return
+        spots = [
+            {
+                'pos': (np.log10(b['freq']), b['gain']),
+                'brush': pg.mkBrush('#4caf50' if b['gain'] > 0 else '#f44336'),
+                'size': 12,
+            }
+            for b in bands
+        ]
+        self._eq_markers.setData(spots)
+
     def clear_diff(self):
         self._zeros.setData([], [])
         self._curve.setData([], [])
+        self._eq_markers.setData([], [])
 
 
 class SpectrumWidget(pg.PlotWidget):
