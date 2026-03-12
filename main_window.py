@@ -2,7 +2,7 @@ import numpy as np
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QComboBox, QLabel, QTableWidget, QTableWidgetItem,
-    QInputDialog, QMessageBox, QGroupBox, QHeaderView, QStatusBar,
+    QInputDialog, QMessageBox, QGroupBox, QHeaderView, QStatusBar, QSpinBox,
 )
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QColor
@@ -86,6 +86,14 @@ class MainWindow(QMainWindow):
         self._stop_btn.setEnabled(False)
         self._stop_btn.clicked.connect(self._on_stop)
         top.addWidget(self._stop_btn)
+
+        top.addWidget(QLabel("Gain:"))
+        self._gain_spin = QSpinBox()
+        self._gain_spin.setRange(-40, 40)
+        self._gain_spin.setValue(0)
+        self._gain_spin.setSuffix(" dB")
+        self._gain_spin.setFixedWidth(75)
+        top.addWidget(self._gain_spin)
 
         top.addStretch()
         root.addLayout(top)
@@ -228,7 +236,8 @@ class MainWindow(QMainWindow):
         else:
             self._avg_db = EMA_ALPHA * smooth_db + (1.0 - EMA_ALPHA) * self._avg_db
 
-        self._spectrum.update_live(self._avg_freqs, self._avg_db)
+        gain = self._gain_spin.value()
+        self._spectrum.update_live(self._avg_freqs, self._avg_db + gain)
 
         # Update difference curve
         if self._target_db is not None:
