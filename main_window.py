@@ -44,7 +44,7 @@ def _interp_to(source_freqs, source_db, target_freqs):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("PA Tuning Tool")
+        self.setWindowTitle("SpectraScope")
         self.resize(1200, 720)
 
         self._engine = AudioEngine()
@@ -72,6 +72,14 @@ class MainWindow(QMainWindow):
 
         # ── Top bar ──────────────────────────────────────────────────────
         top = QHBoxLayout()
+
+        title_label = QLabel("SpectraScope")
+        title_label.setStyleSheet("font-size: 13px; font-weight: bold; color: #00e5ff; letter-spacing: 1px;")
+        top.addWidget(title_label)
+
+        separator = QLabel("|")
+        separator.setStyleSheet("color: #555; margin: 0 4px;")
+        top.addWidget(separator)
 
         top.addWidget(QLabel("Device:"))
         self._device_combo = QComboBox()
