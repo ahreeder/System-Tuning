@@ -99,12 +99,11 @@ class SpectrumWidget(pg.PlotWidget):
         # Line plot (default)
         self._live = self.plot(pen=pg.mkPen('#00e5ff', width=2), name='Live')
 
-        # Bar graph (hidden until mode switched)
+        # Bar graph (hidden until mode switched) — no name to avoid duplicate legend entry
         self._live_bars = pg.BarGraphItem(
             x=[], y0=[], y1=[], width=0.01,
             brush=pg.mkBrush('#00e5ff'),
             pen=pg.mkPen(None),
-            name='Live',
         )
         self.addItem(self._live_bars)
         self._live_bars.setVisible(False)
