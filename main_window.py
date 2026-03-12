@@ -226,8 +226,8 @@ class MainWindow(QMainWindow):
         eq_top.addStretch()
         el.addLayout(eq_top)
 
-        self._eq_table = QTableWidget(0, 4)
-        self._eq_table.setHorizontalHeaderLabels(['Band', 'Freq', 'Gain (dB)', 'Q'])
+        self._eq_table = QTableWidget(0, 5)
+        self._eq_table.setHorizontalHeaderLabels(['Band', 'Type', 'Freq', 'Gain (dB)', 'Q'])
         self._eq_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self._eq_table.setMaximumHeight(150)
         self._eq_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -445,17 +445,20 @@ class MainWindow(QMainWindow):
             freq = band['freq']
             freq_str = f"{freq / 1000:.2f} kHz" if freq >= 1000 else f"{freq:.0f} Hz"
             gain = band['gain']
+            band_type = band.get('type', 'Peak')
 
             self._eq_table.setItem(row, 0, QTableWidgetItem(str(num)))
-            self._eq_table.setItem(row, 1, QTableWidgetItem(freq_str))
+            self._eq_table.setItem(row, 1, QTableWidgetItem(band_type))
+
+            self._eq_table.setItem(row, 2, QTableWidgetItem(freq_str))
 
             gain_item = QTableWidgetItem(f"{gain:+.1f}")
             gain_item.setForeground(
                 QColor('#4caf50') if gain > 0 else QColor('#f44336')
             )
             gain_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self._eq_table.setItem(row, 2, gain_item)
-            self._eq_table.setItem(row, 3, QTableWidgetItem(str(band['q'])))
+            self._eq_table.setItem(row, 3, gain_item)
+            self._eq_table.setItem(row, 4, QTableWidgetItem(str(band['q'])))
 
         if not bands:
             self._status.showMessage("No significant differences found — curves are already close.")
