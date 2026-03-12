@@ -17,9 +17,9 @@ class SpectrumWidget(pg.PlotWidget):
         self.setLabel('left', 'Level (dB)')
         self.setYRange(-60, 12)
         self.setXRange(np.log10(20), np.log10(20000))
-        self.enableAutoRange(axis='y', enable=False)
+        self.getViewBox().disableAutoRange()
         self.showGrid(x=True, y=True, alpha=0.2)
-        self.setMouseEnabled(x=False, y=True)
+        self.setMouseEnabled(x=False, y=False)
 
         ax = self.getAxis('bottom')
         ax.setTicks([[(np.log10(f), _freq_label(f)) for f in FREQ_TICKS]])
