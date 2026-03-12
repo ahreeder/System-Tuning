@@ -130,14 +130,25 @@ class SpectrumWidget(pg.PlotWidget):
     def _on_live_legend_click(self, ev):
         self._live_enabled = not self._live_enabled
         self._apply_live_visibility()
+        # Repaint the legend sample so the eyeball indicator updates
+        legend = self.getPlotItem().legend
+        if legend:
+            for sample, label in legend.items:
+                if getattr(label, 'text', None) == 'Live':
+                    sample.update()
+                    break
 
     def _apply_live_visibility(self):
-        self._live.setVisible(self._live_enabled and self._mode == 'line')
+        # _live visibility always tracks _live_enabled so the legend indicator
+        # is correct in both line and bars modes.
+        self._live.setVisible(self._live_enabled)
         self._live_bars.setVisible(self._live_enabled and self._mode == 'bars')
 
     def set_live_mode(self, mode: str):
         """Switch live display between 'line' and 'bars'."""
         self._mode = mode
+        if mode == 'bars':
+            self._live.setData([], [])  # clear line data so it doesn't ghost over bars
         self._apply_live_visibility()
 
     def update_live(self, freqs: np.ndarray, db: np.ndarray):
