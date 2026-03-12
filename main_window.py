@@ -9,7 +9,7 @@ from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QColor
 
 from audio_engine import AudioEngine, log_smooth, N_SMOOTH, F_MIN, F_MAX
-from spectrum_widget import SpectrumWidget
+from spectrum_widget import SpectrumWidget, DiffWidget
 from curve_manager import save_curve, load_curve, list_curves, delete_curve
 from eq_suggester import suggest_eq
 
@@ -162,6 +162,10 @@ class MainWindow(QMainWindow):
 
         top.addStretch()
         root.addLayout(top)
+
+        # ── Diff panel (zero-centred, above main spectrum) ────────────────
+        self._diff_widget = DiffWidget()
+        root.addWidget(self._diff_widget, stretch=0)
 
         # ── Spectrum ──────────────────────────────────────────────────────
         self._spectrum = SpectrumWidget()
@@ -342,7 +346,7 @@ class MainWindow(QMainWindow):
         if c:
             self._diff_color = c
             self._diff_color_btn.setStyleSheet(f'background-color: {c}; border: 1px solid #666; border-radius: 3px;')
-            self._spectrum.set_diff_color(c)
+            self._diff_widget.set_diff_color(c)
 
     # ------------------------------------------------------------------ style / resolution
 
@@ -383,10 +387,10 @@ class MainWindow(QMainWindow):
         gain = self._gain_spin.value()
         self._spectrum.update_live(self._avg_freqs, self._avg_db + gain)
 
-        # Update difference curve
+        # Update difference panel
         if self._target_db is not None:
             target_aligned = _interp_to(self._target_freqs, self._target_db, self._avg_freqs)
-            self._spectrum.update_diff(self._avg_freqs, target_aligned - self._avg_db)
+            self._diff_widget.update_diff(self._avg_freqs, target_aligned - self._avg_db)
 
     # ------------------------------------------------------------------ curves
 
@@ -443,6 +447,7 @@ class MainWindow(QMainWindow):
         self._target_db = None
         self._target_freqs = None
         self._spectrum.clear_target()
+        self._diff_widget.clear_diff()
         self._status.showMessage("Target curve cleared.")
 
     def _refresh_curves(self):

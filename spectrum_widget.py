@@ -1,15 +1,79 @@
 import numpy as np
 import pyqtgraph as pg
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor
 
 FREQ_TICKS = [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]
 
 Y_MIN = -100
 Y_MAX = 0
 
+DIFF_Y_MIN = -24
+DIFF_Y_MAX = 24
+
 
 def _freq_label(f: float) -> str:
     return f'{int(f // 1000)}k' if f >= 1000 else str(int(f))
+
+
+def _hex_with_alpha(hex_color: str, alpha: int) -> tuple:
+    """Return (r, g, b, alpha) from a '#rrggbb' string."""
+    c = QColor(hex_color)
+    return (c.red(), c.green(), c.blue(), alpha)
+
+
+class DiffWidget(pg.PlotWidget):
+    """Small zero-centred panel showing target − live difference."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent=parent, background='#0a0a14')
+
+        self.setLabel('left', 'Δ dB')
+        self.getViewBox().disableAutoRange()
+        self.setYRange(DIFF_Y_MIN, DIFF_Y_MAX, padding=0)
+        self.setXRange(np.log10(30), np.log10(16000))
+        self.showGrid(x=True, y=True, alpha=0.2)
+        self.setMouseEnabled(x=False, y=False)
+        self.getPlotItem().hideButtons()
+        self.setFixedHeight(140)
+
+        # Suppress the bottom axis labels (main spectrum shows them)
+        ax_bottom = self.getAxis('bottom')
+        ax_bottom.setTicks([[(np.log10(f), '') for f in FREQ_TICKS]])
+        ax_bottom.setHeight(0)
+
+        # Y-axis ticks at useful dB increments
+        ax_left = self.getAxis('left')
+        ax_left.setTicks([[(v, str(v)) for v in range(DIFF_Y_MIN, DIFF_Y_MAX + 1, 6)]])
+
+        # Zero reference line
+        zero_line = pg.InfiniteLine(pos=0, angle=0, pen=pg.mkPen('#555555', width=1))
+        self.addItem(zero_line)
+
+        self._color = '#e040fb'
+
+        # Filled area between curve and zero
+        self._zeros = self.plot([], [], pen=pg.mkPen(None))  # y=0 baseline
+        self._curve = self.plot([], [], pen=pg.mkPen(self._color, width=2))
+        self._fill = pg.FillBetweenItem(
+            self._zeros, self._curve,
+            brush=pg.mkBrush(_hex_with_alpha(self._color, 60)),
+        )
+        self.addItem(self._fill)
+
+    def set_diff_color(self, hex_color: str):
+        self._color = hex_color
+        self._curve.setPen(pg.mkPen(hex_color, width=2))
+        self._fill.setBrush(pg.mkBrush(_hex_with_alpha(hex_color, 60)))
+
+    def update_diff(self, freqs: np.ndarray, diff_db: np.ndarray):
+        log_x = np.log10(freqs)
+        self._zeros.setData(log_x, np.zeros_like(diff_db))
+        self._curve.setData(log_x, diff_db)
+
+    def clear_diff(self):
+        self._zeros.setData([], [])
+        self._curve.setData([], [])
 
 
 class SpectrumWidget(pg.PlotWidget):
@@ -49,7 +113,6 @@ class SpectrumWidget(pg.PlotWidget):
             pen=pg.mkPen('#ff9800', width=2, style=Qt.PenStyle.DashLine),
             name='Target',
         )
-        self._diff = self.plot(pen=pg.mkPen('#e040fb', width=1.5), name='Difference')
 
     def set_live_mode(self, mode: str):
         """Switch live display between 'line' and 'bars'."""
@@ -78,15 +141,8 @@ class SpectrumWidget(pg.PlotWidget):
     def set_target_color(self, hex_color: str):
         self._target.setPen(pg.mkPen(hex_color, width=2, style=Qt.PenStyle.DashLine))
 
-    def set_diff_color(self, hex_color: str):
-        self._diff.setPen(pg.mkPen(hex_color, width=1.5))
-
     def set_target(self, freqs: np.ndarray, db: np.ndarray):
         self._target.setData(np.log10(freqs), db)
 
-    def update_diff(self, freqs: np.ndarray, diff_db: np.ndarray):
-        self._diff.setData(np.log10(freqs), diff_db)
-
     def clear_target(self):
         self._target.setData([], [])
-        self._diff.setData([], [])
