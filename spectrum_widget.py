@@ -2,7 +2,7 @@ import numpy as np
 import pyqtgraph as pg
 from PyQt6.QtCore import Qt
 
-FREQ_TICKS = [20, 31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]
+FREQ_TICKS = [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]
 
 Y_MIN = -100
 Y_MAX = 0
@@ -20,7 +20,7 @@ class SpectrumWidget(pg.PlotWidget):
         self.setLabel('left', 'Level (dB)')
         self.getViewBox().disableAutoRange()
         self.setYRange(Y_MIN, Y_MAX, padding=0)
-        self.setXRange(np.log10(20), np.log10(20000))
+        self.setXRange(np.log10(30), np.log10(16000))
         self.showGrid(x=True, y=True, alpha=0.2)
         self.setMouseEnabled(x=False, y=False)
         self.getPlotItem().hideButtons()
