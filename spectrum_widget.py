@@ -15,9 +15,10 @@ class SpectrumWidget(pg.PlotWidget):
 
         self.setLabel('bottom', 'Frequency (Hz)')
         self.setLabel('left', 'Level (dB)')
-        self.setYRange(-60, 12)
-        self.setXRange(np.log10(20), np.log10(20000))
         self.getViewBox().disableAutoRange()
+        self.getViewBox().setLimits(yMin=-60, yMax=12, minYRange=72, maxYRange=72)
+        self.setYRange(-60, 12, padding=0)
+        self.setXRange(np.log10(20), np.log10(20000))
         self.showGrid(x=True, y=True, alpha=0.2)
         self.setMouseEnabled(x=False, y=False)
 
