@@ -93,6 +93,7 @@ class SpectrumWidget(pg.PlotWidget):
         ax.setTicks([[(np.log10(f), _freq_label(f)) for f in FREQ_TICKS]])
 
         self._mode = 'line'
+        self._live_enabled = True
 
         self.addLegend(offset=(10, 10))
 
@@ -113,11 +114,31 @@ class SpectrumWidget(pg.PlotWidget):
             name='Target',
         )
 
+        # Patch the legend 'Live' entry so clicking it toggles whichever
+        # representation is currently active (line or bars).
+        self._patch_live_legend()
+
+    def _patch_live_legend(self):
+        legend = self.getPlotItem().legend
+        if legend is None:
+            return
+        for sample, label in legend.items:
+            if getattr(label, 'text', None) == 'Live':
+                sample.mouseClickEvent = self._on_live_legend_click
+                break
+
+    def _on_live_legend_click(self, ev):
+        self._live_enabled = not self._live_enabled
+        self._apply_live_visibility()
+
+    def _apply_live_visibility(self):
+        self._live.setVisible(self._live_enabled and self._mode == 'line')
+        self._live_bars.setVisible(self._live_enabled and self._mode == 'bars')
+
     def set_live_mode(self, mode: str):
         """Switch live display between 'line' and 'bars'."""
         self._mode = mode
-        self._live.setVisible(mode == 'line')
-        self._live_bars.setVisible(mode == 'bars')
+        self._apply_live_visibility()
 
     def update_live(self, freqs: np.ndarray, db: np.ndarray):
         if self._mode == 'bars':
