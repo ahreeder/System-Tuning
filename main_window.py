@@ -140,6 +140,15 @@ class MainWindow(QMainWindow):
         clear_btn.clicked.connect(self._on_clear_target)
         cl.addWidget(clear_btn)
 
+        cl.addWidget(QLabel("Offset:"))
+        self._target_offset_spin = QSpinBox()
+        self._target_offset_spin.setRange(-30, 30)
+        self._target_offset_spin.setValue(0)
+        self._target_offset_spin.setSuffix(" dB")
+        self._target_offset_spin.setFixedWidth(75)
+        self._target_offset_spin.valueChanged.connect(self._refresh_target_display)
+        cl.addWidget(self._target_offset_spin)
+
         refresh_btn = QPushButton("↻")
         refresh_btn.setFixedWidth(32)
         refresh_btn.clicked.connect(self._refresh_curves)
@@ -270,8 +279,11 @@ class MainWindow(QMainWindow):
         if not ok or not name.strip():
             return
         name = name.strip()
-        path = save_curve(name, self._avg_freqs, self._avg_db)
+        save_curve(name, self._avg_freqs, self._avg_db)
+        self._target_freqs = self._avg_freqs.copy()
+        self._target_db = self._avg_db.copy()
         self._refresh_curves()
+        self._refresh_target_display()
         self._status.showMessage(f"Target curve '{name}' saved.")
 
     def _on_load(self):
@@ -285,8 +297,13 @@ class MainWindow(QMainWindow):
             return
         self._target_freqs = freqs
         self._target_db = db
-        self._spectrum.set_target(freqs, db)
+        self._refresh_target_display()
         self._status.showMessage(f"Target curve '{name}' loaded.")
+
+    def _refresh_target_display(self):
+        if self._target_freqs is not None:
+            offset = self._target_offset_spin.value()
+            self._spectrum.set_target(self._target_freqs, self._target_db + offset)
 
     def _on_clear_target(self):
         self._target_db = None
