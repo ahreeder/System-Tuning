@@ -45,11 +45,29 @@ class AudioEngine:
         self.data_queue: queue.Queue = queue.Queue(maxsize=20)
 
     def get_devices(self):
-        """Return list of (sd_index, name, max_input_channels) for input-capable devices."""
+        """Return list of (sd_index, name, max_input_channels) for input-capable devices.
+        Prefers ASIO devices when available; otherwise deduplicates by name."""
+        hostapis = sd.query_hostapis()
+        asio_index = next(
+            (i for i, h in enumerate(hostapis) if 'asio' in h['name'].lower()), None
+        )
+
+        all_devs = list(sd.query_devices())
         result = []
-        for i, dev in enumerate(sd.query_devices()):
-            if dev['max_input_channels'] > 0:
-                result.append((i, dev['name'], int(dev['max_input_channels'])))
+
+        if asio_index is not None:
+            for i, dev in enumerate(all_devs):
+                if dev['hostapi'] == asio_index and dev['max_input_channels'] > 0:
+                    result.append((i, dev['name'], int(dev['max_input_channels'])))
+
+        if not result:
+            # Fallback: deduplicate by name, keep first occurrence
+            seen = set()
+            for i, dev in enumerate(all_devs):
+                if dev['max_input_channels'] > 0 and dev['name'] not in seen:
+                    seen.add(dev['name'])
+                    result.append((i, dev['name'], int(dev['max_input_channels'])))
+
         return result
 
     def start(self, device_index: int, channel_idx: int = 0, sample_rate: int = 48000):
