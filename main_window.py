@@ -15,6 +15,13 @@ from eq_suggester import suggest_eq
 
 EMA_ALPHA = 0.15  # default smoothing speed — overridden by UI combo
 
+BAR_RESOLUTIONS = [
+    ("1/3 Oct",  31),
+    ("1/6 Oct",  61),
+    ("1/12 Oct", 121),
+    ("Fine",     200),
+]
+
 AVG_PRESETS = [
     ("Fast",      0.40),
     ("Medium",    0.15),
@@ -110,6 +117,23 @@ class MainWindow(QMainWindow):
         self._avg_combo.setCurrentIndex(1)  # Medium default
         self._avg_combo.setFixedWidth(100)
         top.addWidget(self._avg_combo)
+
+        top.addWidget(QLabel("Style:"))
+        self._style_combo = QComboBox()
+        self._style_combo.addItem("Line", "line")
+        self._style_combo.addItem("Bars", "bars")
+        self._style_combo.setFixedWidth(75)
+        self._style_combo.currentIndexChanged.connect(self._on_style_changed)
+        top.addWidget(self._style_combo)
+
+        top.addWidget(QLabel("Res:"))
+        self._res_combo = QComboBox()
+        for label, n in BAR_RESOLUTIONS:
+            self._res_combo.addItem(label, n)
+        self._res_combo.setCurrentIndex(3)  # Fine default
+        self._res_combo.setFixedWidth(90)
+        self._res_combo.currentIndexChanged.connect(self._on_resolution_changed)
+        top.addWidget(self._res_combo)
 
         top.addStretch()
         root.addLayout(top)
@@ -254,6 +278,16 @@ class MainWindow(QMainWindow):
         self._stop_btn.setEnabled(False)
         self._status.showMessage("Stopped.")
 
+    # ------------------------------------------------------------------ style / resolution
+
+    def _on_style_changed(self):
+        self._spectrum.set_live_mode(self._style_combo.currentData())
+
+    def _on_resolution_changed(self):
+        # Array size changes so the running average must restart
+        self._avg_db = None
+        self._avg_freqs = None
+
     # ------------------------------------------------------------------ timer
 
     def _on_timer(self):
@@ -269,7 +303,8 @@ class MainWindow(QMainWindow):
             return
 
         raw_freqs, raw_db = latest
-        smooth_freqs, smooth_db = log_smooth(raw_freqs, raw_db, N_SMOOTH, F_MIN, F_MAX)
+        n_pts = self._res_combo.currentData()
+        smooth_freqs, smooth_db = log_smooth(raw_freqs, raw_db, n_pts, F_MIN, F_MAX)
 
         # Exponential moving average — speed set by UI combo
         alpha = self._avg_combo.currentData()

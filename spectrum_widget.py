@@ -4,6 +4,9 @@ from PyQt6.QtCore import Qt
 
 FREQ_TICKS = [20, 31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]
 
+Y_MIN = -100
+Y_MAX = 0
+
 
 def _freq_label(f: float) -> str:
     return f'{int(f // 1000)}k' if f >= 1000 else str(int(f))
@@ -16,7 +19,7 @@ class SpectrumWidget(pg.PlotWidget):
         self.setLabel('bottom', 'Frequency (Hz)')
         self.setLabel('left', 'Level (dB)')
         self.getViewBox().disableAutoRange()
-        self.setYRange(-100, 0, padding=0)
+        self.setYRange(Y_MIN, Y_MAX, padding=0)
         self.setXRange(np.log10(20), np.log10(20000))
         self.showGrid(x=True, y=True, alpha=0.2)
         self.setMouseEnabled(x=False, y=False)
@@ -25,17 +28,48 @@ class SpectrumWidget(pg.PlotWidget):
         ax = self.getAxis('bottom')
         ax.setTicks([[(np.log10(f), _freq_label(f)) for f in FREQ_TICKS]])
 
+        self._mode = 'line'
+
         self.addLegend(offset=(10, 10))
+
+        # Line plot (default)
         self._live = self.plot(pen=pg.mkPen('#00e5ff', width=2), name='Live')
+
+        # Bar graph (hidden until mode switched)
+        self._live_bars = pg.BarGraphItem(
+            x=[], y0=[], y1=[], width=0.01,
+            brush=pg.mkBrush('#00e5ff'),
+            pen=pg.mkPen(None),
+            name='Live',
+        )
+        self.addItem(self._live_bars)
+        self._live_bars.setVisible(False)
+
         self._target = self.plot(
             pen=pg.mkPen('#ff9800', width=2, style=Qt.PenStyle.DashLine),
             name='Target',
         )
         self._diff = self.plot(pen=pg.mkPen('#e040fb', width=1.5), name='Difference')
 
+    def set_live_mode(self, mode: str):
+        """Switch live display between 'line' and 'bars'."""
+        self._mode = mode
+        self._live.setVisible(mode == 'line')
+        self._live_bars.setVisible(mode == 'bars')
+
     def update_live(self, freqs: np.ndarray, db: np.ndarray):
-        self._live.setData(np.log10(freqs), db)
-        self.setYRange(-100, 0, padding=0)
+        if self._mode == 'bars':
+            log_x = np.log10(freqs)
+            spacing = (log_x[-1] - log_x[0]) / max(len(log_x) - 1, 1)
+            self._live_bars.setOpts(
+                x=log_x,
+                y0=np.full_like(db, float(Y_MIN)),
+                y1=db,
+                width=spacing * 0.9,
+            )
+        else:
+            self._live.setData(np.log10(freqs), db)
+        self.setYRange(Y_MIN, Y_MAX, padding=0)
 
     def set_target(self, freqs: np.ndarray, db: np.ndarray):
         self._target.setData(np.log10(freqs), db)
