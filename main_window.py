@@ -12,7 +12,14 @@ from spectrum_widget import SpectrumWidget
 from curve_manager import save_curve, load_curve, list_curves
 from eq_suggester import suggest_eq
 
-EMA_ALPHA = 0.1  # smoothing speed for live RTA (lower = slower/smoother)
+EMA_ALPHA = 0.15  # default smoothing speed — overridden by UI combo
+
+AVG_PRESETS = [
+    ("Fast",      0.40),
+    ("Medium",    0.15),
+    ("Slow",      0.05),
+    ("Very Slow", 0.015),
+]
 
 
 def _interp_to(source_freqs, source_db, target_freqs):
@@ -94,6 +101,14 @@ class MainWindow(QMainWindow):
         self._gain_spin.setSuffix(" dB")
         self._gain_spin.setFixedWidth(75)
         top.addWidget(self._gain_spin)
+
+        top.addWidget(QLabel("Avg:"))
+        self._avg_combo = QComboBox()
+        for label, alpha in AVG_PRESETS:
+            self._avg_combo.addItem(label, alpha)
+        self._avg_combo.setCurrentIndex(1)  # Medium default
+        self._avg_combo.setFixedWidth(100)
+        top.addWidget(self._avg_combo)
 
         top.addStretch()
         root.addLayout(top)
@@ -229,12 +244,13 @@ class MainWindow(QMainWindow):
         raw_freqs, raw_db = latest
         smooth_freqs, smooth_db = log_smooth(raw_freqs, raw_db, N_SMOOTH, F_MIN, F_MAX)
 
-        # Exponential moving average
+        # Exponential moving average — speed set by UI combo
+        alpha = self._avg_combo.currentData()
         if self._avg_db is None:
             self._avg_db = smooth_db.copy()
             self._avg_freqs = smooth_freqs.copy()
         else:
-            self._avg_db = EMA_ALPHA * smooth_db + (1.0 - EMA_ALPHA) * self._avg_db
+            self._avg_db = alpha * smooth_db + (1.0 - alpha) * self._avg_db
 
         gain = self._gain_spin.value()
         self._spectrum.update_live(self._avg_freqs, self._avg_db + gain)
