@@ -10,7 +10,7 @@ from PyQt6.QtGui import QColor
 
 from audio_engine import AudioEngine, log_smooth, N_SMOOTH, F_MIN, F_MAX
 from spectrum_widget import SpectrumWidget
-from curve_manager import save_curve, load_curve, list_curves
+from curve_manager import save_curve, load_curve, list_curves, delete_curve
 from eq_suggester import suggest_eq
 
 EMA_ALPHA = 0.15  # default smoothing speed — overridden by UI combo
@@ -191,6 +191,10 @@ class MainWindow(QMainWindow):
         self._target_offset_spin.valueChanged.connect(self._refresh_target_display)
         cl.addWidget(self._target_offset_spin)
 
+        delete_btn = QPushButton("Delete")
+        delete_btn.clicked.connect(self._on_delete_curve)
+        cl.addWidget(delete_btn)
+
         refresh_btn = QPushButton("↻")
         refresh_btn.setFixedWidth(32)
         refresh_btn.clicked.connect(self._refresh_curves)
@@ -206,6 +210,10 @@ class MainWindow(QMainWindow):
         self._suggest_btn = QPushButton("Suggest EQ")
         self._suggest_btn.clicked.connect(self._on_suggest_eq)
         eq_top.addWidget(self._suggest_btn)
+
+        clear_eq_btn = QPushButton("Clear")
+        clear_eq_btn.clicked.connect(self._on_clear_eq)
+        eq_top.addWidget(clear_eq_btn)
 
         eq_top.addWidget(QLabel("Threshold:"))
         self._eq_threshold_spin = QDoubleSpinBox()
@@ -408,6 +416,21 @@ class MainWindow(QMainWindow):
             offset = self._target_offset_spin.value()
             self._spectrum.set_target(self._target_freqs, self._target_db + offset)
 
+    def _on_delete_curve(self):
+        name = self._load_combo.currentText()
+        if not name:
+            return
+        confirm = QMessageBox.question(
+            self, "Delete Curve",
+            f"Delete '{name}'?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+        delete_curve(name)
+        self._refresh_curves()
+        self._status.showMessage(f"Curve '{name}' deleted.")
+
     def _on_clear_target(self):
         self._target_db = None
         self._target_freqs = None
@@ -418,6 +441,10 @@ class MainWindow(QMainWindow):
         self._load_combo.clear()
         for name in list_curves():
             self._load_combo.addItem(name)
+
+    def _on_clear_eq(self):
+        self._eq_table.setRowCount(0)
+        self._status.showMessage("EQ suggestions cleared.")
 
     # ------------------------------------------------------------------ EQ suggest
 

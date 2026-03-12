@@ -20,6 +20,12 @@ def load_curve(name: str):
     return np.array(data['freqs']), np.array(data['db'])
 
 
+def delete_curve(name: str):
+    path = os.path.join(CURVES_DIR, f'{name}.json')
+    if os.path.exists(path):
+        os.remove(path)
+
+
 def list_curves():
     if not os.path.isdir(CURVES_DIR):
         return []
