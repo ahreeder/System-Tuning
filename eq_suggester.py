@@ -3,29 +3,29 @@ from scipy.signal import find_peaks, savgol_filter
 
 
 def suggest_eq(freqs: np.ndarray, diff_db: np.ndarray,
-               n_bands: int = 8, threshold: float = 1.5):
+               n_bands: int = 10, threshold: float = 1.0):
     """
     Analyze a difference curve (target - current, in dB) and return
     parametric EQ suggestions sorted by magnitude.
 
     Returns a list of dicts: {freq, gain, q}
     """
-    if len(diff_db) < 21:
+    if len(diff_db) < 11:
         return []
 
-    # Smooth the difference curve before peak detection
-    win = 21 if len(diff_db) >= 21 else (len(diff_db) | 1)
+    # Light smoothing — small window preserves narrow/high-Q peaks
+    win = 11 if len(diff_db) >= 11 else (len(diff_db) | 1)
     smoothed = savgol_filter(diff_db, window_length=win, polyorder=3)
 
     suggestions = []
 
     # Positive peaks (need boost)
     pos_peaks, _ = find_peaks(
-        smoothed, height=threshold, prominence=threshold * 0.5, distance=5
+        smoothed, height=threshold, prominence=threshold * 0.3, distance=3
     )
     # Negative peaks (need cut) — invert and find
     neg_peaks, _ = find_peaks(
-        -smoothed, height=threshold, prominence=threshold * 0.5, distance=5
+        -smoothed, height=threshold, prominence=threshold * 0.3, distance=3
     )
 
     for idx in pos_peaks:

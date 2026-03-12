@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QComboBox, QLabel, QTableWidget, QTableWidgetItem,
     QInputDialog, QMessageBox, QGroupBox, QHeaderView, QStatusBar, QSpinBox,
+    QDoubleSpinBox,
 )
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QColor
@@ -164,6 +165,23 @@ class MainWindow(QMainWindow):
         self._suggest_btn = QPushButton("Suggest EQ")
         self._suggest_btn.clicked.connect(self._on_suggest_eq)
         eq_top.addWidget(self._suggest_btn)
+
+        eq_top.addWidget(QLabel("Threshold:"))
+        self._eq_threshold_spin = QDoubleSpinBox()
+        self._eq_threshold_spin.setRange(0.5, 6.0)
+        self._eq_threshold_spin.setValue(1.0)
+        self._eq_threshold_spin.setSingleStep(0.5)
+        self._eq_threshold_spin.setSuffix(" dB")
+        self._eq_threshold_spin.setFixedWidth(80)
+        eq_top.addWidget(self._eq_threshold_spin)
+
+        eq_top.addWidget(QLabel("Max bands:"))
+        self._eq_bands_spin = QSpinBox()
+        self._eq_bands_spin.setRange(1, 16)
+        self._eq_bands_spin.setValue(10)
+        self._eq_bands_spin.setFixedWidth(50)
+        eq_top.addWidget(self._eq_bands_spin)
+
         eq_top.addStretch()
         el.addLayout(eq_top)
 
@@ -328,7 +346,11 @@ class MainWindow(QMainWindow):
 
         target_aligned = _interp_to(self._target_freqs, self._target_db, self._avg_freqs)
         diff = target_aligned - self._avg_db
-        bands = suggest_eq(self._avg_freqs, diff)
+        bands = suggest_eq(
+            self._avg_freqs, diff,
+            n_bands=self._eq_bands_spin.value(),
+            threshold=self._eq_threshold_spin.value(),
+        )
 
         self._eq_table.setRowCount(0)
         for num, band in enumerate(bands, start=1):
