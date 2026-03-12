@@ -35,7 +35,7 @@ class DiffWidget(pg.PlotWidget):
         self.showGrid(x=True, y=True, alpha=0.2)
         self.setMouseEnabled(x=False, y=False)
         self.getPlotItem().hideButtons()
-        self.setFixedHeight(140)
+        self.setMinimumHeight(60)
 
         # Suppress the bottom axis labels (main spectrum shows them)
         ax_bottom = self.getAxis('bottom')

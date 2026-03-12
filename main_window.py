@@ -3,7 +3,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QComboBox, QLabel, QTableWidget, QTableWidgetItem,
     QInputDialog, QMessageBox, QGroupBox, QHeaderView, QStatusBar, QSpinBox,
-    QDoubleSpinBox, QColorDialog,
+    QDoubleSpinBox, QColorDialog, QSplitter,
 )
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QColor
@@ -163,13 +163,17 @@ class MainWindow(QMainWindow):
         top.addStretch()
         root.addLayout(top)
 
-        # ── Diff panel (zero-centred, above main spectrum) ────────────────
+        # ── Splitter containing diff panel + main spectrum ────────────────
         self._diff_widget = DiffWidget()
-        root.addWidget(self._diff_widget, stretch=0)
-
-        # ── Spectrum ──────────────────────────────────────────────────────
         self._spectrum = SpectrumWidget()
-        root.addWidget(self._spectrum, stretch=1)
+
+        splitter = QSplitter(Qt.Orientation.Vertical)
+        splitter.addWidget(self._diff_widget)
+        splitter.addWidget(self._spectrum)
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 3)
+        splitter.setHandleWidth(6)
+        root.addWidget(splitter, stretch=1)
 
         # ── Bottom row ────────────────────────────────────────────────────
         bottom = QHBoxLayout()
