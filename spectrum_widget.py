@@ -71,6 +71,16 @@ class SpectrumWidget(pg.PlotWidget):
             self._live.setData(np.log10(freqs), db)
         self.setYRange(Y_MIN, Y_MAX, padding=0)
 
+    def set_live_color(self, hex_color: str):
+        self._live.setPen(pg.mkPen(hex_color, width=2))
+        self._live_bars.setOpts(brush=pg.mkBrush(hex_color))
+
+    def set_target_color(self, hex_color: str):
+        self._target.setPen(pg.mkPen(hex_color, width=2, style=Qt.PenStyle.DashLine))
+
+    def set_diff_color(self, hex_color: str):
+        self._diff.setPen(pg.mkPen(hex_color, width=1.5))
+
     def set_target(self, freqs: np.ndarray, db: np.ndarray):
         self._target.setData(np.log10(freqs), db)
 

@@ -3,7 +3,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QComboBox, QLabel, QTableWidget, QTableWidgetItem,
     QInputDialog, QMessageBox, QGroupBox, QHeaderView, QStatusBar, QSpinBox,
-    QDoubleSpinBox,
+    QDoubleSpinBox, QColorDialog,
 )
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QColor
@@ -134,6 +134,23 @@ class MainWindow(QMainWindow):
         self._res_combo.setFixedWidth(90)
         self._res_combo.currentIndexChanged.connect(self._on_resolution_changed)
         top.addWidget(self._res_combo)
+
+        top.addWidget(QLabel("Colors:"))
+        self._live_color = '#00e5ff'
+        self._target_color = '#ff9800'
+        self._diff_color = '#e040fb'
+        self._live_color_btn = self._make_color_btn(self._live_color)
+        self._target_color_btn = self._make_color_btn(self._target_color)
+        self._diff_color_btn = self._make_color_btn(self._diff_color)
+        self._live_color_btn.setToolTip("Live curve color")
+        self._target_color_btn.setToolTip("Target curve color")
+        self._diff_color_btn.setToolTip("Difference curve color")
+        self._live_color_btn.clicked.connect(self._on_live_color)
+        self._target_color_btn.clicked.connect(self._on_target_color)
+        self._diff_color_btn.clicked.connect(self._on_diff_color)
+        top.addWidget(self._live_color_btn)
+        top.addWidget(self._target_color_btn)
+        top.addWidget(self._diff_color_btn)
 
         top.addStretch()
         root.addLayout(top)
@@ -277,6 +294,39 @@ class MainWindow(QMainWindow):
         self._start_btn.setEnabled(True)
         self._stop_btn.setEnabled(False)
         self._status.showMessage("Stopped.")
+
+    # ------------------------------------------------------------------ colors
+
+    def _make_color_btn(self, hex_color: str) -> QPushButton:
+        btn = QPushButton()
+        btn.setFixedSize(24, 24)
+        btn.setStyleSheet(f'background-color: {hex_color}; border: 1px solid #666; border-radius: 3px;')
+        return btn
+
+    def _pick_color(self, current: str, title: str):
+        color = QColorDialog.getColor(QColor(current), self, title)
+        return color.name() if color.isValid() else None
+
+    def _on_live_color(self):
+        c = self._pick_color(self._live_color, "Live Curve Color")
+        if c:
+            self._live_color = c
+            self._live_color_btn.setStyleSheet(f'background-color: {c}; border: 1px solid #666; border-radius: 3px;')
+            self._spectrum.set_live_color(c)
+
+    def _on_target_color(self):
+        c = self._pick_color(self._target_color, "Target Curve Color")
+        if c:
+            self._target_color = c
+            self._target_color_btn.setStyleSheet(f'background-color: {c}; border: 1px solid #666; border-radius: 3px;')
+            self._spectrum.set_target_color(c)
+
+    def _on_diff_color(self):
+        c = self._pick_color(self._diff_color, "Difference Curve Color")
+        if c:
+            self._diff_color = c
+            self._diff_color_btn.setStyleSheet(f'background-color: {c}; border: 1px solid #666; border-radius: 3px;')
+            self._spectrum.set_diff_color(c)
 
     # ------------------------------------------------------------------ style / resolution
 
