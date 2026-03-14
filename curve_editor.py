@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QSizePolicy,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QKeySequence, QShortcut
 
 from curve_manager import save_curve, load_curve
 
@@ -38,6 +39,7 @@ class CurveEditorDialog(QDialog):
 
         self._name = name
         self._drag_idx = None
+        self._history = []          # stack of _ctrl_db snapshots for undo
 
         # Load curve
         self._orig_freqs, self._orig_db = load_curve(name)
@@ -128,6 +130,12 @@ class CurveEditorDialog(QDialog):
         smooth_btn.clicked.connect(self._on_smooth)
         btn_row.addWidget(smooth_btn)
 
+        self._undo_btn = QPushButton("Undo")
+        self._undo_btn.setToolTip("Undo last change  (Ctrl+Z)")
+        self._undo_btn.setEnabled(False)
+        self._undo_btn.clicked.connect(self._on_undo)
+        btn_row.addWidget(self._undo_btn)
+
         reset_btn = QPushButton("Reset")
         reset_btn.setToolTip("Restore the curve to its last saved state")
         reset_btn.clicked.connect(self._on_reset)
@@ -152,6 +160,9 @@ class CurveEditorDialog(QDialog):
         self._orig_vb_drag = vb.mouseDragEvent
         vb.mouseDragEvent = self._vb_drag_event
 
+        # Ctrl+Z shortcut
+        QShortcut(QKeySequence.StandardKey.Undo, self).activated.connect(self._on_undo)
+
     # ------------------------------------------------------------------ drag
 
     def _vb_drag_event(self, ev, axis=None):
@@ -170,6 +181,8 @@ class CurveEditorDialog(QDialog):
             dists = np.abs(ctrl_log_f - mouse_log_f)
             nearest = int(np.argmin(dists))
             self._drag_idx = nearest if dists[nearest] < DRAG_THRESHOLD else None
+            if self._drag_idx is not None:
+                self._push_history()
 
         if self._drag_idx is not None:
             self._ctrl_db[self._drag_idx] = float(np.clip(vpos.y(), -60, 20))
@@ -198,8 +211,20 @@ class CurveEditorDialog(QDialog):
 
     # ------------------------------------------------------------------ buttons
 
+    def _push_history(self):
+        self._history.append(self._ctrl_db.copy())
+        self._undo_btn.setEnabled(True)
+
+    def _on_undo(self):
+        if not self._history:
+            return
+        self._ctrl_db = self._history.pop()
+        self._undo_btn.setEnabled(bool(self._history))
+        self._update_curve()
+
     def _on_smooth(self):
         """Smooth the control points with a Savitzky-Golay pass."""
+        self._push_history()
         win = min(9, N_CTRL if N_CTRL % 2 == 1 else N_CTRL - 1)
         self._ctrl_db = savgol_filter(self._ctrl_db, window_length=win, polyorder=3)
         self._update_curve()
