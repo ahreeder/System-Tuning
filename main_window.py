@@ -15,6 +15,7 @@ from spectrum_widget import SpectrumWidget, DiffWidget
 from curve_manager import save_curve, load_curve, list_curves, delete_curve
 from eq_suggester import suggest_eq
 from lake_exporter import write_ovl
+from curve_editor import CurveEditorDialog
 
 EMA_ALPHA = 0.15  # default smoothing speed — overridden by UI combo
 
@@ -196,6 +197,11 @@ class MainWindow(QMainWindow):
         load_btn = QPushButton("Load")
         load_btn.clicked.connect(self._on_load)
         cl.addWidget(load_btn)
+
+        edit_btn = QPushButton("Edit")
+        edit_btn.setToolTip("Open curve editor to manually reshape this curve")
+        edit_btn.clicked.connect(self._on_edit_curve)
+        cl.addWidget(edit_btn)
 
         clear_btn = QPushButton("Clear")
         clear_btn.clicked.connect(self._on_clear_target)
@@ -466,6 +472,27 @@ class MainWindow(QMainWindow):
         delete_curve(name)
         self._refresh_curves()
         self._status.showMessage(f"Curve '{name}' deleted.")
+
+    def _on_edit_curve(self):
+        name = self._load_combo.currentText()
+        if not name:
+            QMessageBox.warning(self, "No Curve", "Select a curve to edit.")
+            return
+        dlg = CurveEditorDialog(name, parent=self)
+        dlg.curve_saved.connect(self._on_curve_edited)
+        dlg.exec()
+
+    def _on_curve_edited(self, name: str):
+        """Reload the curve into the display after the editor saves it."""
+        if self._load_combo.currentText() == name:
+            try:
+                freqs, db = load_curve(name)
+            except Exception:
+                return
+            self._target_freqs = freqs
+            self._target_db    = db
+            self._refresh_target_display()
+            self._status.showMessage(f"Curve '{name}' updated from editor.")
 
     def _on_clear_target(self):
         self._target_db = None
