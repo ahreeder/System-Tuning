@@ -1,17 +1,20 @@
+import os
+import subprocess
 import numpy as np
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QComboBox, QLabel, QTableWidget, QTableWidgetItem,
     QInputDialog, QMessageBox, QGroupBox, QHeaderView, QStatusBar, QSpinBox,
-    QDoubleSpinBox, QColorDialog, QSplitter,
+    QDoubleSpinBox, QColorDialog, QSplitter, QFileDialog,
 )
-from PyQt6.QtCore import QTimer, Qt
+from PyQt6.QtCore import QTimer, Qt, QSettings
 from PyQt6.QtGui import QColor
 
 from audio_engine import AudioEngine, log_smooth, N_SMOOTH, F_MIN, F_MAX
 from spectrum_widget import SpectrumWidget, DiffWidget
 from curve_manager import save_curve, load_curve, list_curves, delete_curve
 from eq_suggester import suggest_eq
+from lake_exporter import write_ovl
 
 EMA_ALPHA = 0.15  # default smoothing speed — overridden by UI combo
 
@@ -246,6 +249,16 @@ class MainWindow(QMainWindow):
         self._eq_bands_spin.setValue(10)
         self._eq_bands_spin.setFixedWidth(50)
         eq_top.addWidget(self._eq_bands_spin)
+
+        export_lake_btn = QPushButton("Export to Lake")
+        export_lake_btn.clicked.connect(self._on_export_lake)
+        eq_top.addWidget(export_lake_btn)
+
+        set_path_btn = QPushButton("⚙ Lake Path")
+        set_path_btn.setFixedWidth(90)
+        set_path_btn.setToolTip("Set Lake Controller library folder")
+        set_path_btn.clicked.connect(self._on_set_lake_path)
+        eq_top.addWidget(set_path_btn)
 
         eq_top.addStretch()
         el.addLayout(eq_top)
@@ -515,3 +528,76 @@ class MainWindow(QMainWindow):
             self._status.showMessage("No significant differences found — curves are already close.")
         else:
             self._status.showMessage(f"EQ suggestion: {len(bands)} band(s) identified.")
+
+    # ------------------------------------------------------------------ Lake export
+
+    def _on_set_lake_path(self):
+        settings = QSettings('SpectraScope', 'SpectraScope')
+        current = settings.value('lake_library_path', '')
+        folder = QFileDialog.getExistingDirectory(
+            self, "Select Lake Controller Library Folder", current
+        )
+        if folder:
+            settings.setValue('lake_library_path', folder)
+            self._status.showMessage(f"Lake library path set: {folder}")
+
+    def _on_export_lake(self):
+        if self._eq_table.rowCount() == 0:
+            QMessageBox.warning(self, "No EQ", "Run 'Suggest EQ' first.")
+            return
+
+        # Collect bands from the table (use stored band dicts from last suggest)
+        if self._avg_db is None or self._target_db is None:
+            QMessageBox.warning(self, "No Data", "Need live audio and a target curve.")
+            return
+
+        target_aligned = _interp_to(self._target_freqs, self._target_db, self._avg_freqs)
+        diff = target_aligned - self._avg_db
+        bands = suggest_eq(
+            self._avg_freqs, diff,
+            n_bands=self._eq_bands_spin.value(),
+            threshold=self._eq_threshold_spin.value(),
+        )
+        if not bands:
+            QMessageBox.warning(self, "No EQ", "No bands to export.")
+            return
+
+        settings = QSettings('SpectraScope', 'SpectraScope')
+        lake_path = settings.value('lake_library_path', '')
+
+        if not lake_path:
+            lake_path = QFileDialog.getExistingDirectory(
+                self, "Select Lake Controller Library Folder"
+            )
+            if not lake_path:
+                return
+            settings.setValue('lake_library_path', lake_path)
+
+        name, ok = QInputDialog.getText(
+            self, "Export to Lake", "Overlay name in Lake Controller:",
+            text="SpectraScope AutoEQ"
+        )
+        if not ok or not name.strip():
+            return
+        name = name.strip()
+
+        safe_name = "".join(c if c.isalnum() or c in ' -_.' else '_' for c in name)
+        out_path = os.path.join(lake_path, f"{safe_name}.ovl")
+
+        try:
+            write_ovl(bands, name, out_path)
+        except Exception as exc:
+            QMessageBox.critical(self, "Export Error", str(exc))
+            return
+
+        self._status.showMessage(f"Exported {len(bands)} band(s) → {out_path}")
+
+        # Bring Lake Controller to the foreground
+        try:
+            subprocess.Popen(
+                ['powershell', '-WindowStyle', 'Hidden', '-Command',
+                 '(New-Object -ComObject WScript.Shell).AppActivate("Lake Controller")'],
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
+        except Exception:
+            pass  # Non-fatal — user is on a non-Windows system or Lake isn't open
