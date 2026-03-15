@@ -25,10 +25,25 @@ N_CTRL = 28
 DRAG_THRESHOLD = 0.12
 
 
+class _EditViewBox(pg.ViewBox):
+    """ViewBox subclass that routes left-button drags to the editor dialog."""
+
+    def __init__(self, dialog, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._dlg = dialog
+
+    def mouseDragEvent(self, ev, axis=None):
+        if ev.button() == Qt.MouseButton.LeftButton:
+            ev.accept()
+            pos = self.mapToView(ev.pos())
+            self._dlg._handle_drag(ev, pos)
+        else:
+            super().mouseDragEvent(ev, axis)
+
+
 class CurveEditorDialog(QDialog):
     """Modal dialog for editing a saved target curve."""
 
-    # Emitted when the curve is saved so the main window can reload it
     curve_saved = pyqtSignal(str)
 
     def __init__(self, name: str, parent=None):
@@ -39,7 +54,7 @@ class CurveEditorDialog(QDialog):
 
         self._name = name
         self._drag_idx = None
-        self._history = []          # stack of _ctrl_db snapshots for undo
+        self._history = []
 
         # Load curve
         self._orig_freqs, self._orig_db = load_curve(name)
@@ -47,9 +62,7 @@ class CurveEditorDialog(QDialog):
         # Build log-spaced control point frequencies
         f_min = float(self._orig_freqs[0])
         f_max = float(self._orig_freqs[-1])
-        self._ctrl_freqs = np.logspace(
-            np.log10(f_min), np.log10(f_max), N_CTRL
-        )
+        self._ctrl_freqs = np.logspace(np.log10(f_min), np.log10(f_max), N_CTRL)
 
         # Initialise control point dB values from the loaded curve
         self._ctrl_db = np.interp(
@@ -63,7 +76,6 @@ class CurveEditorDialog(QDialog):
         self._work_db    = self._orig_db.copy()
 
         self._setup_ui()
-        self._update_curve()
 
     # ------------------------------------------------------------------ UI
 
@@ -85,11 +97,15 @@ class CurveEditorDialog(QDialog):
 
         # ── Plot ─────────────────────────────────────────────────────────
         pg.setConfigOptions(antialias=True)
-        self._pw = pg.PlotWidget()
+        vb = _EditViewBox(self)
+        self._pw = pg.PlotWidget(viewBox=vb)
         self._pw.setBackground('#1a1a1a')
         self._pw.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
+
+        # Hide the "A" autoscale button
+        self._pw.hideButtons()
 
         # Axes
         self._pw.setLogMode(x=True, y=False)
@@ -119,6 +135,7 @@ class CurveEditorDialog(QDialog):
             hoverable=True,
             hoverBrush=pg.mkBrush('#ff9800'),
         )
+        self._scatter.setData(x=self._ctrl_freqs, y=self._ctrl_db)
         self._pw.addItem(self._scatter)
 
         layout.addWidget(self._pw)
@@ -156,28 +173,19 @@ class CurveEditorDialog(QDialog):
 
         layout.addLayout(btn_row)
 
-        # ── Install drag handler on the ViewBox ───────────────────────────
-        vb = self._pw.getViewBox()
-        self._orig_vb_drag = vb.mouseDragEvent
-        vb.mouseDragEvent = self._vb_drag_event
-
         # Ctrl+Z shortcut
         QShortcut(QKeySequence.StandardKey.Undo, self).activated.connect(self._on_undo)
 
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._update_curve()
+
     # ------------------------------------------------------------------ drag
 
-    def _vb_drag_event(self, ev, axis=None):
-        """Intercept left-button drags to move control points."""
-        if ev.button() != Qt.MouseButton.LeftButton:
-            self._orig_vb_drag(ev, axis)
-            return
-
-        ev.accept()
-        vb   = self._pw.getViewBox()
-        vpos = vb.mapSceneToView(ev.scenePos())
-
+    def _handle_drag(self, ev, pos):
+        """Called by _EditViewBox on left-button drags."""
         if ev.isStart():
-            mouse_log_f = vpos.x()   # already in log10 space (setLogMode)
+            mouse_log_f = pos.x()   # ViewBox x is in log10 space when setLogMode(x=True)
             ctrl_log_f  = np.log10(self._ctrl_freqs)
             dists = np.abs(ctrl_log_f - mouse_log_f)
             nearest = int(np.argmin(dists))
@@ -186,7 +194,7 @@ class CurveEditorDialog(QDialog):
                 self._push_history()
 
         if self._drag_idx is not None:
-            self._ctrl_db[self._drag_idx] = float(np.clip(vpos.y(), -60, 20))
+            self._ctrl_db[self._drag_idx] = float(np.clip(pos.y(), -60, 20))
             self._update_curve()
 
         if ev.isFinish():
@@ -203,12 +211,8 @@ class CurveEditorDialog(QDialog):
         )
         self._work_db = cs(np.log10(self._work_freqs))
 
-        # Update plot items
         self._curve_item.setData(self._work_freqs, self._work_db)
-        self._scatter.setData(
-            x=self._ctrl_freqs,
-            y=self._ctrl_db,
-        )
+        self._scatter.setData(x=self._ctrl_freqs, y=self._ctrl_db)
 
     # ------------------------------------------------------------------ buttons
 
@@ -224,14 +228,12 @@ class CurveEditorDialog(QDialog):
         self._update_curve()
 
     def _on_smooth(self):
-        """Smooth the control points with a Savitzky-Golay pass."""
         self._push_history()
         win = min(9, N_CTRL if N_CTRL % 2 == 1 else N_CTRL - 1)
         self._ctrl_db = savgol_filter(self._ctrl_db, window_length=win, polyorder=3)
         self._update_curve()
 
     def _on_reset(self):
-        """Restore control points to the originally loaded curve."""
         self._ctrl_db = np.interp(
             np.log10(self._ctrl_freqs),
             np.log10(self._orig_freqs),
@@ -240,7 +242,6 @@ class CurveEditorDialog(QDialog):
         self._update_curve()
 
     def _on_save(self):
-        """Save the edited curve back to disk and close."""
         save_curve(self._name, self._work_freqs, self._work_db)
         self.curve_saved.emit(self._name)
         self.accept()
