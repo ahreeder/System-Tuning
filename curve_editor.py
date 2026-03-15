@@ -242,7 +242,7 @@ class CurveEditorDialog(QDialog):
 
     def _on_smooth(self):
         self._push_history()
-        win = min(9, N_CTRL if N_CTRL % 2 == 1 else N_CTRL - 1)
+        win = min(5, N_CTRL if N_CTRL % 2 == 1 else N_CTRL - 1)
         self._ctrl_db = savgol_filter(self._ctrl_db, window_length=win, polyorder=3)
         self._update_curve()
 
