@@ -107,6 +107,7 @@ class CurveEditorDialog(QDialog):
 
         # Curve line
         self._curve_item = self._pw.plot(
+            self._work_freqs, self._work_db,
             pen=pg.mkPen('#ff9800', width=2)
         )
 
