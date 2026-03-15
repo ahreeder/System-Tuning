@@ -18,6 +18,17 @@ from PyQt6.QtGui import QKeySequence, QShortcut
 
 from curve_manager import save_curve, load_curve
 
+# Match the main graph axes exactly
+FREQ_TICKS = [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]
+X_MIN = np.log10(30)
+X_MAX = np.log10(16000)
+Y_MIN = -100
+Y_MAX = 0
+
+
+def _freq_label(f: float) -> str:
+    return f'{int(f // 1000)}k' if f >= 1000 else str(int(f))
+
 # Number of draggable control points (log-spaced across the freq range)
 N_CTRL = 28
 
@@ -99,7 +110,7 @@ class CurveEditorDialog(QDialog):
         pg.setConfigOptions(antialias=True)
         vb = _EditViewBox(self)
         self._pw = pg.PlotWidget(viewBox=vb)
-        self._pw.setBackground('#1a1a1a')
+        self._pw.setBackground('#0f0f1a')
         self._pw.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
@@ -107,23 +118,25 @@ class CurveEditorDialog(QDialog):
         # Hide the "A" autoscale button
         self._pw.hideButtons()
 
-        # Axes
-        self._pw.setLogMode(x=True, y=False)
-        self._pw.setLabel('bottom', 'Frequency', units='Hz')
-        self._pw.setLabel('left', 'Level', units='dB')
-        self._pw.setXRange(np.log10(self._orig_freqs[0]),
-                           np.log10(self._orig_freqs[-1]))
-        self._pw.setYRange(-30, 10)
+        # Axes — match main graph exactly
+        self._pw.setLabel('bottom', 'Frequency (Hz)')
+        self._pw.setLabel('left', 'Level (dB)')
+        self._pw.getViewBox().disableAutoRange()
+        self._pw.setXRange(X_MIN, X_MAX, padding=0)
+        self._pw.setYRange(Y_MIN, Y_MAX, padding=0)
         self._pw.showGrid(x=True, y=True, alpha=0.2)
+
+        ax = self._pw.getAxis('bottom')
+        ax.setTicks([[(np.log10(f), _freq_label(f)) for f in FREQ_TICKS]])
 
         # 0 dB reference line
         zero_line = pg.InfiniteLine(pos=0, angle=0,
                                     pen=pg.mkPen('#444', width=1, style=Qt.PenStyle.DashLine))
         self._pw.addItem(zero_line)
 
-        # Curve line
+        # Curve line — x data pre-logged to match main graph convention
         self._curve_item = self._pw.plot(
-            self._work_freqs, self._work_db,
+            np.log10(self._work_freqs), self._work_db,
             pen=pg.mkPen('#ff9800', width=2)
         )
 
@@ -135,7 +148,7 @@ class CurveEditorDialog(QDialog):
             hoverable=True,
             hoverBrush=pg.mkBrush('#ff9800'),
         )
-        self._scatter.setData(x=self._ctrl_freqs, y=self._ctrl_db)
+        self._scatter.setData(x=np.log10(self._ctrl_freqs), y=self._ctrl_db)
         self._pw.addItem(self._scatter)
 
         layout.addWidget(self._pw)
@@ -194,7 +207,7 @@ class CurveEditorDialog(QDialog):
                 self._push_history()
 
         if self._drag_idx is not None:
-            self._ctrl_db[self._drag_idx] = float(np.clip(pos.y(), -60, 20))
+            self._ctrl_db[self._drag_idx] = float(np.clip(pos.y(), Y_MIN, Y_MAX))
             self._update_curve()
 
         if ev.isFinish():
@@ -211,8 +224,8 @@ class CurveEditorDialog(QDialog):
         )
         self._work_db = cs(np.log10(self._work_freqs))
 
-        self._curve_item.setData(self._work_freqs, self._work_db)
-        self._scatter.setData(x=self._ctrl_freqs, y=self._ctrl_db)
+        self._curve_item.setData(np.log10(self._work_freqs), self._work_db)
+        self._scatter.setData(x=np.log10(self._ctrl_freqs), y=self._ctrl_db)
 
     # ------------------------------------------------------------------ buttons
 
