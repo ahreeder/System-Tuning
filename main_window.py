@@ -408,12 +408,13 @@ class MainWindow(QMainWindow):
             self._avg_db = alpha * smooth_db + (1.0 - alpha) * self._avg_db
 
         gain = self._gain_spin.value()
-        self._spectrum.update_live(self._avg_freqs, self._avg_db + gain)
+        gained_db = self._avg_db + gain
+        self._spectrum.update_live(self._avg_freqs, gained_db)
 
         # Update difference panel + live EQ markers
         if self._target_db is not None:
             target_aligned = _interp_to(self._target_freqs, self._target_db, self._avg_freqs)
-            diff = target_aligned - self._avg_db
+            diff = target_aligned - gained_db
             self._diff_widget.update_diff(self._avg_freqs, diff)
             bands = suggest_eq(
                 self._avg_freqs, diff,
@@ -521,7 +522,7 @@ class MainWindow(QMainWindow):
             return
 
         target_aligned = _interp_to(self._target_freqs, self._target_db, self._avg_freqs)
-        diff = target_aligned - self._avg_db
+        diff = target_aligned - (self._avg_db + self._gain_spin.value())
         bands = suggest_eq(
             self._avg_freqs, diff,
             n_bands=self._eq_bands_spin.value(),
@@ -579,7 +580,7 @@ class MainWindow(QMainWindow):
             return
 
         target_aligned = _interp_to(self._target_freqs, self._target_db, self._avg_freqs)
-        diff = target_aligned - self._avg_db
+        diff = target_aligned - (self._avg_db + self._gain_spin.value())
         bands = suggest_eq(
             self._avg_freqs, diff,
             n_bands=self._eq_bands_spin.value(),
